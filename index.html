@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>师傅，大师兄被妖怪抓走了！</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="game-container">
+    <!-- 主游戏画布 -->
+    <canvas id="gameCanvas"></canvas>
+    <!-- 小地图 -->
+    <canvas id="minimap" width="180" height="180"></canvas>
+    <!-- 装备图鉴面板 -->
+    <!-- 图鉴按钮（小地图正下方） -->
+    <button id="craft-book-btn" onclick="equipCodex.toggle()">📖 图鉴</button>
+    <div id="craft-book-panel" class="hidden">
+      <div class="cb-header">
+        <span class="cb-title">📖 装备图鉴</span>
+        <div class="cb-header-tabs">
+          <button class="cb-tab active" data-quality="all">全部</button>
+          <button class="cb-tab" data-quality="白">白</button>
+          <button class="cb-tab" data-quality="绿">绿</button>
+          <button class="cb-tab" data-quality="蓝">蓝</button>
+          <button class="cb-tab" data-quality="紫">紫</button>
+          <button class="cb-tab" data-quality="橙">橙</button>
+        </div>
+        <button class="cb-close" onclick="equipCodex.toggle()">✕</button>
+      </div>
+      <div class="cb-body">
+        <div class="cb-recipe-list" id="cb-recipe-list"></div>
+        <div class="cb-detail-panel" id="cb-detail-panel">
+          <div class="cb-detail-hint">← 点击左侧任意装备<br>查看详细属性与来源</div>
+        </div>
+      </div>
+    </div>
+    <!-- UI层（HTML覆盖层） -->
+    <div id="ui-overlay">
+      <!-- 顶部信息 -->
+      <div id="top-bar">
+        <span id="wave-info">等待入侵...</span>
+        <span id="game-timer">00:00</span>
+      </div>
+      <!-- 底部UI -->
+      <div id="bottom-ui">
+        <!-- 左侧角色信息 -->
+        <div id="char-info">
+          <div class="char-avatar" id="player-avatar">孙</div>
+          <div class="bars">
+            <div class="bar-row">
+              <span class="bar-label">生命</span>
+              <div class="bar-bg"><div id="hp-bar" class="bar hp"></div></div>
+              <span id="hp-text">100/100</span>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">法力</span>
+              <div class="bar-bg"><div id="mp-bar" class="bar mp"></div></div>
+              <span id="mp-text">100/100</span>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">经验</span>
+              <div class="bar-bg"><div id="exp-bar" class="bar exp"></div></div>
+              <span id="exp-text">0/100</span>
+            </div>
+          </div>
+          <div id="level-gold">
+            <span id="level-text">Lv.1</span>
+            <span id="gold-text">💰 0</span>
+          </div>
+        </div>
+        <!-- 角色属性面板 -->
+        <div id="player-stats">
+          <div class="ps-title">角色属性</div>
+          <div class="ps-row"><span class="ps-label">⚔️ 攻击</span><span class="ps-val" id="ps-atk">—</span></div>
+          <div class="ps-row"><span class="ps-label">🛡️ 防御</span><span class="ps-val" id="ps-armor">—</span></div>
+          <div class="ps-row"><span class="ps-label">💥 增伤</span><span class="ps-val" id="ps-dmgbonus">—</span></div>
+          <div class="ps-row"><span class="ps-label">🌀 闪避</span><span class="ps-val" id="ps-dodge">—</span></div>
+        </div>
+        <!-- 技能栏 -->
+        <div id="skill-bar">
+          <div class="skill-slot" id="skill-e" data-key="E" title="蓄力1秒，向指定方向劈出600px金箍棒">
+            <div class="skill-icon skill-1">棍</div>
+            <div class="skill-cd" id="cd-e"></div>
+            <span class="skill-key">E</span>
+            <span class="skill-name">当头一棒</span>
+          </div>
+          <div class="skill-slot locked" id="skill-r" data-key="R" title="激活菩提棒法，持续10秒：攻击间隔-25%，每次普攻吸血25%，并有50%概率触发爆炸">
+            <div class="skill-icon skill-2">棒</div>
+            <div class="skill-cd" id="cd-r"></div>
+            <span class="skill-key">R</span>
+            <span class="skill-name">菩提棒法</span>
+          </div>
+          <div class="skill-slot locked" id="skill-t" data-key="T" title="就地舞动金箍棒2秒，持续在300px范围内每秒造成300%伤害，期间可自由走路">
+            <div class="skill-icon skill-3">舞</div>
+            <div class="skill-cd" id="cd-t"></div>
+            <span class="skill-key">T</span>
+            <span class="skill-name">滚花乱舞</span>
+          </div>
+          <div class="skill-slot locked" id="skill-y" data-key="Y" title="召唤4个分身替你战斗，继承全部属性，持续5秒自动攻击最近敌人">
+            <div class="skill-icon skill-4">孙</div>
+            <div class="skill-cd" id="cd-y"></div>
+            <span class="skill-key">Y</span>
+            <span class="skill-name">猴子猴孙</span>
+          </div>
+          <div class="skill-slot locked" id="skill-q" data-key="G" title="驾驶筋斗云，瞬间传送至师傅身边">
+            <div class="skill-icon skill-5">☁️</div>
+            <div class="skill-cd" id="cd-q"></div>
+            <span class="skill-key">G</span>
+            <span class="skill-name">筋斗云</span>
+          </div>
+        </div>
+        <!-- 装备栏 -->
+        <div id="equip-bar">
+          <div class="equip-slot" id="eq-weapon" title="武器（剑）">⚔️</div>
+          <div class="equip-slot" id="eq-head" title="头饰">👑</div>
+          <div class="equip-slot" id="eq-armor" title="盔甲">🧥</div>
+          <div class="equip-slot" id="eq-boots" title="鞋">👢</div>
+          <div class="equip-slot" id="eq-acc1" title="饰品1">💍</div>
+          <div class="equip-slot" id="eq-acc2" title="饰品2">📿</div>
+        </div>
+        <!-- 心法栏 -->
+        <div id="xinfa-bar">
+          <div id="xinfa-status">心法</div>
+          <div id="xinfa-slot" class="xinfa-none">未修炼</div>
+        </div>
+        <!-- 背包按钮 -->
+        <button id="bag-open-btn" onclick="game.bag.toggle()" title="打开背包 (B)">🎒 背包[B]</button>
+        <!-- 图鉴按钮 -->
+        <button id="codex-open-btn" onclick="equipCodex.toggle()" title="打开装备图鉴">📖 图鉴</button>
+        <!-- 选中目标信息 -->
+        <div id="target-info" class="hidden">
+          <div class="ti-header">
+            <span class="ti-name" id="ti-name">—</span>
+            <span class="ti-level" id="ti-level"></span>
+          </div>
+          <div class="ti-hp-row">
+            <span class="ti-label">血量</span>
+            <div class="ti-hp-bg"><div class="ti-hp-bar" id="ti-hp-bar"></div></div>
+            <span class="ti-hp-text" id="ti-hp-text">—</span>
+          </div>
+          <div class="ti-stats">
+            <div class="ti-stat"><span class="ti-stat-label">⚔️ 攻击</span><span class="ti-stat-val" id="ti-atk">—</span></div>
+            <div class="ti-stat"><span class="ti-stat-label">🛡️ 防御</span><span class="ti-stat-val" id="ti-armor">—</span></div>
+          </div>
+          <div class="ti-drops hidden" id="ti-drops">
+            <div class="ti-drops-label">💰 可能掉落</div>
+            <div class="ti-drops-list" id="ti-drops-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 胜负界面 -->
+    <div id="result-screen" class="hidden">
+      <div id="result-box">
+        <div id="result-title"></div>
+        <div id="result-msg"></div>
+        <button id="result-btn" onclick="game.restart()">再来一局</button>
+      </div>
+    </div>
+    <!-- 升级提示 -->
+    <div id="level-up-toast" class="hidden">升级！</div>
+    <!-- 技能获得提示 -->
+    <div id="skill-toast" class="hidden"></div>
+    <!-- 任务追踪面板（左上角） -->
+    <div id="quest-tracker" class="hidden"></div>
+    <!-- 任务完成横幅 -->
+    <div id="quest-complete-banner" class="hidden">
+      <div class="qcb-icon">📜</div>
+      <div id="qcb-title">✅ 任务完成</div>
+    </div>
+    <!-- 土地公出现横幅 -->
+    <div id="tudigong-banner" class="hidden">
+      <div class="tdg-banner-icon">👴</div>
+      <div class="tdg-banner-text">
+        <div class="tdg-banner-title">🏮 土地公出现了！</div>
+        <div class="tdg-banner-sub">前往主城与土地公交谈，可传送至各区域</div>
+      </div>
+    </div>
+    <!-- 死亡遮罩 -->
+    <div id="death-overlay" class="hidden">
+      <div id="death-box">
+        <div id="death-icon">💀</div>
+        <div id="death-title">悟空阵亡！</div>
+        <div id="death-timer">10 秒后在师傅处复活</div>
+        <div id="death-tip">保护好师傅唐僧！</div>
+      </div>
+    </div>
+    <!-- 心法面板 -->
+    <div id="xinfa-panel" class="hidden">
+      <div class="panel-title">选择心法</div>
+      <div class="xinfa-options">
+        <div class="xinfa-option" onclick="game.learnXinfa('buddha')">
+          <div class="xinfa-icon">☸️</div>
+          <div class="xinfa-opt-name">佛门心法</div>
+          <div class="xinfa-desc">减少受到伤害20%，技能冷却减少25%</div>
+        </div>
+        <div class="xinfa-option" onclick="game.learnXinfa('taoism')">
+          <div class="xinfa-icon">☯️</div>
+          <div class="xinfa-opt-name">道教心法</div>
+          <div class="xinfa-desc">攻击间隔-25%（攻速+33%），普攻伤害+33%</div>
+        </div>
+      </div>
+      <button onclick="document.getElementById('xinfa-panel').classList.add('hidden')">关闭</button>
+    </div>
+    <!-- 技能悬停 Tooltip -->
+    <div id="skill-tooltip" class="hidden"></div>
+
+    <!-- GM 指令面板 -->
+    <button id="gm-toggle-btn" onclick="document.getElementById('gm-panel').classList.toggle('hidden')">GM</button>
+    <div id="gm-panel" class="hidden">
+      <div class="panel-title">⚙️ GM 指令</div>
+      <button id="gm-btn-speed"      class="gm-btn" onclick="game.gmToggleSpeed()">🚀 移速 +200%</button>
+      <button id="gm-btn-atk"        class="gm-btn" onclick="game.gmToggleAtk()">⚔️ 攻击 +500%</button>
+      <button id="gm-btn-invincible" class="gm-btn" onclick="game.gmToggleInvincible()">🛡️ 无敌</button>
+      <button class="gm-btn gm-btn-once"    onclick="game.gmLevelUp()">⬆️ 升级 +1</button>
+      <button class="gm-btn gm-btn-once"    onclick="gmItemPanelOpen()">🎁 获得道具</button>
+    </div>
+
+    <!-- GM 获得道具二级面板 -->
+    <div id="gm-item-panel" class="hidden">
+      <div class="gm-item-header">
+        <span>🎁 获得道具</span>
+        <button class="gm-item-close" onclick="document.getElementById('gm-item-panel').classList.add('hidden')">✕</button>
+      </div>
+
+      <!-- 第一层：类型选择 -->
+      <div id="gm-item-step1">
+        <div class="gm-item-subtitle">选择类型</div>
+        <div class="gm-item-type-grid">
+          <button class="gm-type-btn" onclick="gmItemSelectType('exp')">✦ 经验球</button>
+          <button class="gm-type-btn" onclick="gmItemSelectType('gold')">💰 金币</button>
+          <button class="gm-type-btn" onclick="gmItemSelectType('equip')">⚔️ 指定装备</button>
+          <button class="gm-type-btn" onclick="gmItemSelectType('random')">🎲 随机装备</button>
+        </div>
+      </div>
+
+      <!-- 第二层：参数配置（动态显示） -->
+      <div id="gm-item-step2" class="hidden">
+        <!-- 经验球 / 金币 数量输入 -->
+        <div id="gm-item-amount-panel" class="hidden">
+          <div class="gm-item-subtitle" id="gm-item-amount-label">数量</div>
+          <input id="gm-item-amount-input" type="number" class="gm-item-input" value="500" min="1" max="999999" />
+          <button class="gm-item-confirm" onclick="gmItemConfirmAmount()">✅ 生成</button>
+        </div>
+
+        <!-- 指定装备列表 -->
+        <div id="gm-item-equip-panel" class="hidden">
+          <div class="gm-item-subtitle">选择装备</div>
+          <div id="gm-item-equip-list" class="gm-item-equip-list"></div>
+        </div>
+
+        <!-- 随机装备品质选择 -->
+        <div id="gm-item-random-panel" class="hidden">
+          <div class="gm-item-subtitle">选择品质</div>
+          <div class="gm-item-type-grid">
+            <button class="gm-type-btn gm-q-white"  onclick="gmItemConfirmRandom('white')">白色</button>
+            <button class="gm-type-btn gm-q-green"  onclick="gmItemConfirmRandom('green')">绿色</button>
+            <button class="gm-type-btn gm-q-blue"   onclick="gmItemConfirmRandom('blue')">蓝色</button>
+            <button class="gm-type-btn gm-q-purple" onclick="gmItemConfirmRandom('purple')">紫色</button>
+            <button class="gm-type-btn gm-q-orange" onclick="gmItemConfirmRandom('orange')">橙色</button>
+            <button class="gm-type-btn"             onclick="gmItemConfirmRandom(null)">完全随机</button>
+          </div>
+        </div>
+
+        <button class="gm-item-back" onclick="gmItemBack()">← 返回</button>
+      </div>
+    </div>
+    <!-- 开局引导提示 -->
+    <div id="intro-guide" class="hidden">
+      <div class="ig-inner">
+        <div class="ig-icon">📜</div>
+        <div class="ig-text">
+          <div class="ig-title">师傅在主城等你！</div>
+          <div class="ig-sub">前往中央主城，找<span class="ig-highlight">唐僧师傅</span>接取任务<br>
+            <span class="ig-key">按 Q</span> 与师傅交谈 &nbsp;·&nbsp; <span class="ig-key">WASD</span> 移动
+          </div>
+        </div>
+        <div class="ig-arrow">👇</div>
+      </div>
+    </div>
+
+    <!-- 装备详情面板 -->
+    <div id="item-panel" class="hidden">
+      <div class="panel-title" id="item-panel-title">装备详情</div>
+      <div id="item-panel-content"></div>
+      <div id="item-panel-btns">
+        <button id="btn-equip-item" onclick="game.equipPendingItem()">装备</button>
+        <button onclick="document.getElementById('item-panel').classList.add('hidden')">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 游戏脚本（按依赖顺序加载） -->
+  <script src="js/constants.js"></script>
+  <script src="js/tilemap.js"></script>
+  <script src="js/equipments.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/boss.js"></script>
+  <script src="js/wave.js"></script>
+  <script src="js/bag.js"></script>
+  <script src="js/loot.js"></script>
+  <script src="js/npc.js"></script>
+  <script src="js/quest.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/codex.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
