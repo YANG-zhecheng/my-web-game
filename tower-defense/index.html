@@ -1,1 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>刀塔塔防</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="game-container">
 
+  <!-- 顶部HUD -->
+  <div id="hud">
+    <!-- 左侧：金币 / 逃脱 / 波次 / 关卡 -->
+    <div class="hud-item">💰 <span id="gold-display">100</span></div>
+    <div class="hud-item">❤️ <span id="escaped-display" class="escaped-num">0</span>/20</div>
+    <div class="hud-item">🌊 <span id="wave-display">0</span>/30</div>
+    <div id="stage-hud-item" class="hud-item" style="display:none;">🏰 第<span id="stage-display">2</span>关</div>
+    <div class="hud-sep"></div>
+    <!-- 隐藏旧按钮（保留 id 供 JS 兼容引用） -->
+    <button id="start-btn" style="display:none;"></button>
+    <!-- 难度按钮保留在 DOM 中供 JS 引用，但完全隐藏 -->
+    <div id="difficulty-group" style="display:none;">
+      <button class="diff-btn" data-diff="easy"   data-mult="0.6">😊 简单</button>
+      <button class="diff-btn selected" data-diff="normal" data-mult="1">⚔️ 中等</button>
+      <button class="diff-btn" data-diff="hard"   data-mult="1.5">💀 困难</button>
+      <button class="diff-btn" data-diff="brutal" data-mult="2">☠️ 残酷</button>
+    </div>
+    <!-- 右侧按钮组：宽度固定与 stats-panel 对齐（200px） -->
+    <div id="hud-right-btns">
+      <button id="pause-btn" disabled title="暂停/继续游戏 (Space)">⏸ 暂停</button>
+      <button id="speed-btn">⚡ 1x</button>
+      <button id="restart-btn">🔄 重开</button>
+      <button id="help-btn">❓ 说明</button>
+      <button id="gm-btn">🛠️ GM</button>
+    </div>
+  </div>
+
+  <!-- GM 面板 -->
+  <div id="gm-panel" class="hidden" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#1a1a2e;border:2px solid #6a0dad;border-radius:10px;padding:18px 24px;z-index:9999;min-width:220px;box-shadow:0 0 24px #6a0dad88;color:#fff;">
+    <div style="font-weight:bold;font-size:15px;color:#cc88ff;margin-bottom:12px;">🛠️ GM 面板</div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button id="gm-gold-btn" style="background:#f39c12;color:#000;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:bold;font-size:13px;">💰 金币 +999</button>
+      <button id="gm-exp-btn" style="background:#8e44ad;color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:bold;font-size:13px;">⭐ 经验 +100</button>
+      <button id="gm-clear-btn" style="background:#e74c3c;color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:bold;font-size:13px;">💀 一键清屏（消灭所有怪物）</button>
+      <button id="gm-spawn-btn" style="background:#1abc9c;color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:bold;font-size:13px;">🏗️ 生成塔</button>
+      <button id="gm-skip-wave20-btn" style="background:#3d5afe;color:#fff;border:none;border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:bold;font-size:13px;">⏩ 跳至第30关</button>
+      <button id="gm-close-btn" style="background:#444;color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px;margin-top:4px;">✕ 关闭</button>
+    </div>
+  </div>
+
+  <!-- GM 生成塔 二级面板 -->
+  <div id="gm-spawn-panel" class="hidden" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#0f1923;border:2px solid #1abc9c;border-radius:12px;padding:20px 24px;z-index:10000;width:420px;max-height:80vh;overflow-y:auto;box-shadow:0 0 32px #1abc9c88;color:#fff;">
+    <div style="font-weight:bold;font-size:15px;color:#1abc9c;margin-bottom:14px;">🏗️ 选择要生成的塔</div>
+    <div id="gm-spawn-list" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;"></div>
+    <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end;">
+      <button id="gm-spawn-close-btn" style="background:#555;color:#fff;border:none;border-radius:6px;padding:7px 16px;cursor:pointer;font-size:13px;">✕ 取消</button>
+    </div>
+  </div>
+
+  <!-- 主体区域：地图 + 右侧面板 -->
+  <div id="main-area">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- 右侧面板 -->
+    <div id="right-panel">
+      <!-- 抽卡/主操作按钮区 -->
+      <div id="draw-btn-group">
+        <!-- 主操作按钮：抽卡 / 开始游戏 / 下一波 / 进行中（多状态合一） -->
+        <button id="main-action-btn" class="big-btn main-btn-draw">🎴 抽卡（剩2次）</button>
+        <!-- 隐藏旧按钮（保留 id 供 JS 兼容） -->
+        <div id="draw-tier-tabs" style="display:none;"></div>
+        <button id="draw-btn" style="display:none;"></button>
+        <button id="premium-draw-btn" class="big-btn draw" style="width:100%;display:none;">
+          🌟 高级抽卡 <span id="premium-draw-cost-label" class="cost">48💰</span>
+        </button>
+        <button id="draw-upgrade-btn" style="display:none;"></button>
+        <!-- 玩家等级经验条 -->
+        <div id="exp-bar-wrap" style="padding:4px 2px 2px;user-select:none;">
+          <div style="background:rgba(255,255,255,0.08);border-radius:8px;overflow:hidden;height:20px;position:relative;border:1px solid rgba(255,255,255,0.12);">
+            <div id="exp-bar-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#7c3aed,#a855f7,#c084fc);border-radius:8px;transition:width 0.35s ease;"></div>
+            <span id="exp-bar-label" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;color:#fff;text-shadow:0 0 4px #7c3aed;letter-spacing:0.5px;">Lv1  0/100</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 配方参考 -->
+      <div id="recipe-panel">
+        <div class="panel-title">⚗️ 合成配方</div>
+        <div id="recipes"></div>
+      </div>
+
+      <!-- 特殊配方入口 -->
+      <div style="padding:4px 8px 2px;">
+        <button id="special-recipe-btn" style="width:100%;background:linear-gradient(90deg,#6600cc,#aa00ff);color:#fff;border:none;border-radius:6px;padding:7px 10px;cursor:pointer;font-weight:bold;font-size:12px;">📖 配方详情</button>
+      </div>
+
+      <!-- 地图4：放置石头按钮（仅地图4显示） -->
+      <div id="rock-panel" style="padding:4px 8px 2px;margin-top:4px;display:none;">
+        <button id="rock-btn" class="big-btn" style="width:100%;background:linear-gradient(90deg,#555,#888);color:#fff;border:none;border-radius:6px;padding:9px 10px;cursor:pointer;font-weight:bold;font-size:13px;">
+          🪨 放置石头 <span class="cost">20💰</span>
+        </button>
+      </div>
+
+      <!-- 核弹购买区 -->
+      <div id="nuke-panel" style="padding:4px 8px 2px;margin-top:4px;">
+        <button id="nuke-btn" style="width:100%;background:linear-gradient(90deg,#7f0000,#cc0000);color:#fff;border:none;border-radius:6px;padding:9px 10px;cursor:pointer;font-weight:bold;font-size:13px;box-shadow:0 0 10px #cc000066;">☢️ 购买核弹 <span style="color:#ffee88;">800💰</span></button>
+        <div id="nuke-count" style="text-align:center;color:#ff8888;font-size:11px;margin-top:3px;"></div>
+      </div>
+
+    </div>
+
+    <!-- 伤害统计列（第三列） -->
+    <div id="stats-panel">
+      <div class="panel-title">📊 本关伤害统计</div>
+      <div id="dmg-stats-list"></div>
+    </div>
+  </div>
+
+  <!-- 升级模式提示横幅 -->
+  <div id="upgrade-banner" class="hidden">
+    🔼 升级模式：点击同等级同类型的塔（绿色）来吞噬 | 右键取消
+    <button id="cancel-upgrade-btn">✕ 取消</button>
+  </div>
+
+  <!-- 放置模式提示横幅 -->
+  <div id="place-banner" class="hidden">
+    🏗️ 放置模式：悬停绿色格子预览，点击放置 | Esc取消
+    <button id="cancel-place-btn">✕ 取消</button>
+  </div>
+
+  <!-- 核弹选点提示横幅 -->
+  <div id="nuke-banner" class="hidden" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(90deg,#7f0000,#cc0000);color:#fff;padding:8px 16px;font-weight:bold;font-size:13px;display:flex;align-items:center;justify-content:center;gap:12px;z-index:2000;">
+    ☢️ 核弹模式：点击地图任意位置投放 | 右键取消
+    <button id="cancel-nuke-btn" style="background:#fff;color:#cc0000;border:none;border-radius:4px;padding:3px 10px;cursor:pointer;font-weight:bold;">✕ 取消</button>
+  </div>
+
+  <!-- 游戏说明弹窗 -->
+  <div id="help-modal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.72);display:flex;align-items:center;justify-content:center;z-index:9000;">
+    <div style="background:#0f1923;border:2px solid #1a6b8a;border-radius:14px;padding:24px 28px;max-width:520px;width:90%;max-height:80vh;overflow-y:auto;color:#e0e0e0;box-shadow:0 0 32px #1a6b8a88;">
+      <div style="font-size:18px;font-weight:bold;color:#4fc3f7;margin-bottom:14px;">❓ 游戏说明</div>
+      <div style="font-size:13px;line-height:1.8;">
+        <p><b>� 胜利条件：</b>在30波怪物全部到达终点前消灭它们。逃出20只即失败。通关当前关卡后可进入下一关，通关所有关卡即最终胜利。</p>
+        <p><b>🎴 抽卡：</b>每次消耗一次抽卡机会，从5张中选1张精灵放置到空格。每关开始有2次免费机会，可用金币购买更多次数。</p>
+        <p><b>⚗️ 配方合成：</b>3只同种同级精灵自动合成为高一级精灵。特定组合可合成强力特殊塔，查看右侧"配方详情"了解秘方。</p>
+      </div>
+      <div style="text-align:right;margin-top:16px;">
+        <button id="help-close-btn" style="background:#1a6b8a;color:#fff;border:none;border-radius:7px;padding:7px 22px;cursor:pointer;font-size:13px;font-weight:bold;">✕ 关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 抽卡弹窗（左：抽卡区  右：秘方区） -->
+  <div id="draw-modal" class="hidden">
+    <div id="draw-modal-inner">
+      <!-- 右上角关闭按钮 -->
+      <button id="draw-close-btn" title="关闭（不消耗抽卡次数）">✕</button>
+
+      <!-- 左侧：抽卡区 -->
+      <div id="draw-left">
+        <div class="modal-title">✨ 选择1张塔放置</div>
+        <div id="draw-cards"></div>
+        <div id="draw-combo-preview"></div>
+        <div class="modal-actions">
+          <button id="confirm-draw-btn" disabled>请选择1张塔</button>
+          <button id="refresh-draw-btn"><span class="refresh-icon">🎴</span> 刷新卡池（100 💰）</button>
+        </div>
+      </div>
+
+      <!-- 右侧：内嵌秘方区 -->
+      <div id="draw-right">
+        <div style="font-size:13px;font-weight:bold;color:#dd88ff;padding:0 0 8px;border-bottom:1px solid #7744aa44;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+          ✨ 秘方
+          <span style="font-size:10px;color:#997799;font-weight:normal;">（悬停卡面查看可合成）</span>
+        </div>
+        <div id="draw-inline-recipe"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 经验条等级概率 Tooltip -->
+  <div id="exp-level-tooltip" class="hidden"></div>
+
+  <!-- 塔Tooltip（悬浮） -->
+  <div id="tower-tooltip" class="hidden">
+    <div id="tooltip-content"></div>
+    <div id="tooltip-actions"></div>
+  </div>
+
+  <!-- 游戏结束覆盖层 -->
+  <div id="overlay" class="hidden">
+    <div id="overlay-content">
+      <h1 id="overlay-title"></h1>
+      <p id="overlay-msg"></p>
+      <div id="overlay-extra" style="margin:10px 0;color:#ffdd44;font-size:14px;min-height:20px;"></div>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+        <button id="overlay-next-btn" class="hidden" style="background:linear-gradient(135deg,#1a8a2e,#27ae60);color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:15px;font-weight:bold;box-shadow:0 0 14px #27ae6066;">➡️ 进入下一关</button>
+        <button id="overlay-btn">🔄 重新开始</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 波次过渡 -->
+  <div id="wave-transition" class="hidden">
+    <div id="wave-text"></div>
+  </div>
+
+  <!-- 商店弹窗（第10/20关结束后出现） -->
+  <div id="shop-modal" class="hidden">
+    <div id="shop-modal-inner">
+      <div id="shop-title">🏪 关卡商店</div>
+      <div id="shop-subtitle">选择一件物品购买</div>
+      <div id="shop-gold-display">💰 当前金币：<span id="shop-gold-amount">0</span></div>
+      <div id="shop-items">
+        <!-- 商品1：抽卡券×2 -->
+        <div class="shop-item" id="shop-item-0" onclick="shopBuy(0)">
+          <div class="shop-item-icon">🎴</div>
+          <div class="shop-item-info">
+            <div class="shop-item-name">抽卡券 ×2</div>
+            <div class="shop-item-desc">立即获得两次抽卡机会</div>
+          </div>
+          <div class="shop-item-cost">
+            <span class="shop-cost-num">800</span>
+            <span class="shop-cost-icon">💰</span>
+          </div>
+        </div>
+        <!-- 商品2：抽卡券×1 -->
+        <div class="shop-item" id="shop-item-1" onclick="shopBuy(1)">
+          <div class="shop-item-icon">🎴</div>
+          <div class="shop-item-info">
+            <div class="shop-item-name">抽卡券 ×1</div>
+            <div class="shop-item-desc">立即获得一次抽卡机会</div>
+          </div>
+          <div class="shop-item-cost">
+            <span class="shop-cost-num">350</span>
+            <span class="shop-cost-icon">💰</span>
+          </div>
+        </div>
+        <!-- 商品3：全局伤害加成 -->
+        <div class="shop-item" id="shop-item-2" onclick="shopBuy(2)">
+          <div class="shop-item-icon">⚔️</div>
+          <div class="shop-item-info">
+            <div class="shop-item-name">战斗强化</div>
+            <div class="shop-item-desc">所有塔伤害永久 +3%（可叠加）</div>
+          </div>
+          <div class="shop-item-cost">
+            <span class="shop-cost-num">200</span>
+            <span class="shop-cost-icon">💰</span>
+          </div>
+        </div>
+      </div>
+      <div id="shop-footer">
+        <button id="shop-skip-btn" onclick="shopSkip()">跳过，不购买</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="game.js"></script>
+</body>
+</html>
